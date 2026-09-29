@@ -1,0 +1,28 @@
+name: Docker Build Test
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  docker-build:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Build Docker image
+        run: |
+          docker build -t nodeapp:test .
+
+      - name: Verify Docker image
+        run: |
+          docker images nodeapp:test
+
+      - name: Remove Docker image
+        if: always()
+        run: |
+          docker rmi nodeapp:test || true
