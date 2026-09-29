@@ -25,4 +25,4 @@ jobs:
       - name: Remove Docker image
         if: always()
         run: |
-          docker rmi nodeapp:test || true
+          docker rmi nodeapp:test
