@@ -32,6 +32,14 @@ jobs:
         env:
           DEVSECOPS_TOKEN: ${{ secrets.DEVSECOPS_TOKEN }}
         run: |
+          Write-Output "[DEVSECOPS] Pinging DevSecOps UCP to establish connection..."
+          try {
+              $pingResponse = Invoke-RestMethod -Uri "https://devsechub.in/api/v1/integrations/cli/ping" -Method Post -Headers @{ "Authorization" = "Bearer $env:DEVSECOPS_TOKEN"; "Content-Type" = "application/json" } -Body "{ `"token`": `"$env:DEVSECOPS_TOKEN`" }"
+              Write-Output "[DEVSECOPS] Successfully Connected"
+          } catch {
+              Write-Warning "Ping failed, but continuing to scan. Please check your DEVSECOPS_TOKEN."
+          }
+
           Write-Output "[DEVSECOPS] Scanning container image..."
           trivy image --format json -o trivy-report.json nodeapp:test
           
@@ -44,10 +52,11 @@ jobs:
                   Write-Error "🛑 PIPELINE BLOCKED BY SECURITY POLICY 🛑 - Vulnerabilities violate blocking rules."
                   exit 1
               }
-              Write-Output "Warning: Failed to upload results - $_"
+              Write-Error "Failed to upload results - $_"
+              exit 1
           }
 
-      # 6. Cleanup (Removed || true since it's Bash syntax, used continue-on-error instead)
+      # 6. Cleanup (Using continue-on-error instead of bash syntax)
       - name: Remove Docker image
         if: always()
         continue-on-error: true
