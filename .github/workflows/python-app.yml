@@ -22,6 +22,23 @@ jobs:
         run: |
           docker images nodeapp:test
 
+      # --- DEVSECOPS SCANNER INTEGRATION ---
+      - name: Run DevSecOps Pipeline Scan
+        env:
+          DEVSECOPS_TOKEN: ${{ secrets.DEVSECOPS_TOKEN }}
+          DEVSECOPS_URL: https://devsechub.in/api/v1
+          # Tell the scanner to scan this newly built image:
+          DEVSECOPS_IMAGE: nodeapp:test 
+        run: |
+          # 1. Download the scanner CLI package
+          curl -sfL -o DEVSECOPS_Pipeline_Scanner_linux_amd64 https://devsechub.in/api/v1/integrations/cli/download/linux/amd64?baseUrl=https%3A%2F%2Fdevsechub.in%2Fapi%2Fv1
+          
+          # 2. Make it executable
+          chmod +x ./DEVSECOPS_Pipeline_Scanner_linux_amd64
+          
+          # 3. Run the scanner
+          ./DEVSECOPS_Pipeline_Scanner_linux_amd64
+
       - name: Remove Docker image
         if: always()
         run: |
