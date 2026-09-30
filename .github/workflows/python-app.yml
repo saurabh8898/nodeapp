@@ -27,7 +27,7 @@ jobs:
       - name: Verify Docker image
         run: docker images nodeapp:test
 
-      # 5. DEVSECOPS SCAN (Using Local Trivy + PowerShell Upload)
+      # 5. DEVSECOPS SCAN (Using Local Trivy + curl.exe Upload)
       - name: Run DevSecOps Pipeline Scan
         env:
           DEVSECOPS_TOKEN: ${{ secrets.DEVSECOPS_TOKEN }}
@@ -44,18 +44,16 @@ jobs:
           trivy image --format json -o trivy-report.json nodeapp:test
           
           Write-Output "[DEVSECOPS] Uploading scan results to DevSecOps UCP..."
-          try {
-              $response = Invoke-WebRequest -Uri "https://devsechub.in/api/v1/integrations/cli/upload" -Method Post -Headers @{ "Authorization" = "Bearer $env:DEVSECOPS_TOKEN"; "Content-Type" = "application/json" } -InFile "trivy-report.json"
+          $HTTP_STATUS = curl.exe -s -w "%{http_code}" -o upload_response.txt -X POST -H "Authorization: Bearer $env:DEVSECOPS_TOKEN" -H "Content-Type: application/json" -d "@trivy-report.json" "https://devsechub.in/api/v1/integrations/cli/upload"
+          
+          if ($HTTP_STATUS -eq "406") {
+              Write-Error "🛑 PIPELINE BLOCKED BY SECURITY POLICY 🛑 - Vulnerabilities violate blocking rules."
+              exit 1
+          } elseif (($HTTP_STATUS -eq "200") -or ($HTTP_STATUS -eq "201")) {
               Write-Output "[DEVSECOPS] Scan complete and uploaded successfully!"
-          } catch {
-              # Check if it was specifically a 406 Blocked error
-              if ($null -ne $_.Exception.Response -and $_.Exception.Response.StatusCode.value__ -eq 406) {
-                  Write-Error "🛑 PIPELINE BLOCKED BY SECURITY POLICY 🛑 - Vulnerabilities violate blocking rules."
-                  exit 1
-              }
-              
-              # Print the ACTUAL error message (e.g. invalid token format, connection lost)
-              Write-Error "Failed to upload results: $($_.Exception.Message)"
+          } else {
+              $responseBody = Get-Content upload_response.txt -Raw
+              Write-Error "Failed to upload results. HTTP Status: $HTTP_STATUS - Response: $responseBody"
               exit 1
           }
 
