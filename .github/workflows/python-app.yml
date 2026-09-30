@@ -35,9 +35,9 @@ jobs:
           Write-Output "[DEVSECOPS] Pinging DevSecOps UCP to establish connection..."
           try {
               $pingResponse = Invoke-RestMethod -Uri "https://devsechub.in/api/v1/integrations/cli/ping" -Method Post -Headers @{ "Authorization" = "Bearer $env:DEVSECOPS_TOKEN"; "Content-Type" = "application/json" } -Body "{ `"token`": `"$env:DEVSECOPS_TOKEN`" }"
-              Write-Output "[DEVSECOPS] Successfully Connected"
+              Write-Output "[DEVSECOPS] Successfully Connected!"
           } catch {
-              Write-Warning "Ping failed, but continuing to scan. Please check your DEVSECOPS_TOKEN."
+              Write-Warning "Ping failed: $($_.Exception.Message)"
           }
 
           Write-Output "[DEVSECOPS] Scanning container image..."
@@ -48,11 +48,14 @@ jobs:
               $response = Invoke-WebRequest -Uri "https://devsechub.in/api/v1/integrations/cli/upload" -Method Post -Headers @{ "Authorization" = "Bearer $env:DEVSECOPS_TOKEN"; "Content-Type" = "application/json" } -InFile "trivy-report.json"
               Write-Output "[DEVSECOPS] Scan complete and uploaded successfully!"
           } catch {
-              if ($_.Exception.Response.StatusCode.value__ -eq 406) {
+              # Check if it was specifically a 406 Blocked error
+              if ($null -ne $_.Exception.Response -and $_.Exception.Response.StatusCode.value__ -eq 406) {
                   Write-Error "🛑 PIPELINE BLOCKED BY SECURITY POLICY 🛑 - Vulnerabilities violate blocking rules."
                   exit 1
               }
-              Write-Error "Failed to upload results - $_"
+              
+              # Print the ACTUAL error message (e.g. invalid token format, connection lost)
+              Write-Error "Failed to upload results: $($_.Exception.Message)"
               exit 1
           }
 
