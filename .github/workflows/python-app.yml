@@ -11,35 +11,39 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
+      # 1. FIX DUBIOUS OWNERSHIP ERROR BEFORE CHECKOUT
+      - name: Disable Git dubious ownership check
+        run: git config --global --add safe.directory "*"
 
+      # 2. Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 3. Build Docker Image
       - name: Build Docker image
         run: |
           docker build -t nodeapp:test .
 
+      # 4. Verify
       - name: Verify Docker image
         run: |
           docker images nodeapp:test
 
-      # --- DEVSECOPS SCANNER INTEGRATION ---
+      # 5. DEVSECOPS SCAN
       - name: Run DevSecOps Pipeline Scan
         env:
           DEVSECOPS_TOKEN: ${{ secrets.DEVSECOPS_TOKEN }}
           DEVSECOPS_URL: https://devsechub.in/api/v1
-          # Tell the scanner to scan this newly built image:
           DEVSECOPS_IMAGE: nodeapp:test 
+        # Using bash shell explicitly to ensure the scanner script runs smoothly on Windows
+        shell: bash
         run: |
-          # 1. Download the scanner CLI package
-          curl -sfL -o DEVSECOPS_Pipeline_Scanner_linux_amd64 https://devsechub.in/api/v1/integrations/cli/download/linux/amd64?baseUrl=https%3A%2F%2Fdevsechub.in%2Fapi%2Fv1
-          
-          # 2. Make it executable
-          chmod +x ./DEVSECOPS_Pipeline_Scanner_linux_amd64
-          
-          # 3. Run the scanner
-          ./DEVSECOPS_Pipeline_Scanner_linux_amd64
+          curl -sfL -o DEVSECOPS_Pipeline_Scanner https://devsechub.in/api/v1/integrations/cli/download/windows/amd64?baseUrl=https%3A%2F%2Fdevsechub.in%2Fapi%2Fv1
+          chmod +x ./DEVSECOPS_Pipeline_Scanner
+          ./DEVSECOPS_Pipeline_Scanner
 
+      # 6. Cleanup
       - name: Remove Docker image
         if: always()
         run: |
-          docker rmi nodeapp:test
+          docker rmi nodeapp:test || true
